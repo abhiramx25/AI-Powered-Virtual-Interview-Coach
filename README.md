@@ -14,7 +14,7 @@ An intelligent web application that provides personalized mock interview practic
 ## 🛠️ Tech Stack
 
 - **Frontend**: Streamlit
-- **AI Backend**: Cohere API
+- **AI Backend**: groq API
 - **Database**: SQLite
 - **Visualization**: Plotly, Pandas
 - **Language**: Python
