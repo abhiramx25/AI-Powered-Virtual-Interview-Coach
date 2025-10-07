@@ -1,7 +1,6 @@
 streamlit>=1.26.0
-cohere>=5.18.0
 pandas>=2.1.0
-matplotlib>=3.7.0
 plotly>=5.15.0
+requests>=2.31.0  # ← This is for Groq API calls
 sqlalchemy>=2.0.0
 python-dotenv>=1.0.0
