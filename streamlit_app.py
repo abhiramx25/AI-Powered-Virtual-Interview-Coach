@@ -12,7 +12,7 @@ storage.init_db()
 
 # Page configuration
 st.set_page_config(
-    page_title="AI Interview Coach",
+    page_title="Abhiram's AI Interview Coach",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -257,3 +257,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
