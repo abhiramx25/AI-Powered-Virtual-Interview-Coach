@@ -4,7 +4,7 @@ import plotly.express as px
 from datetime import datetime
 
 # Import local modules
-from cohere_client import CohereClient
+from groq_client import GroqClient  # ✅ changed from cohere_client
 import storage
 
 # Initialize database
@@ -43,10 +43,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def main():
-    # Initialize Cohere client
-    if "cohere_client" not in st.session_state:
+    # Initialize Groq client
+    if "groq_client" not in st.session_state:
         try:
-            st.session_state.cohere_client = CohereClient()
+            st.session_state.groq_client = GroqClient()  # ✅ using Groq now
             st.session_state.client_ready = True
         except Exception as e:
             st.session_state.client_ready = False
@@ -94,7 +94,7 @@ def main():
             if st.button("🎯 Generate Interview Questions", use_container_width=True, type="primary"):
                 with st.spinner("🤖 AI is generating role-specific questions..."):
                     try:
-                        questions = st.session_state.cohere_client.generate_questions(role, num_questions)
+                        questions = st.session_state.groq_client.generate_questions(role, num_questions)  # ✅ updated
                         st.session_state.questions = questions
                         st.session_state.current_question = 0
                         st.session_state.answers = {}
@@ -135,7 +135,7 @@ def main():
                 else:
                     with st.spinner("🔍 Analyzing your answer..."):
                         try:
-                            feedback = st.session_state.cohere_client.score_and_improve(
+                            feedback = st.session_state.groq_client.score_and_improve(  # ✅ updated
                                 questions[current_idx], answer, role
                             )
                             
