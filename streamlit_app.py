@@ -53,7 +53,7 @@ def main():
             st.error(f"Failed to initialize AI: {e}")
 
     # Header
-    st.markdown('<h1 class="main-title">🎯 AI Virtual Interview Coach</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-title">🎯 Abhiram's AI Virtual Interview Coach</h1>', unsafe_allow_html=True)
     st.markdown("### Practice interviews with instant AI feedback and progress tracking")
     
     # Sidebar
@@ -257,4 +257,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
