@@ -109,13 +109,15 @@ if 'evaluations' not in st.session_state:
 # Initialize clients
 @st.cache_resource
 def init_clients():
-    api_key = st.secrets.get("GROQ_API_KEY", None)
-    if not api_key:
-        st.error("⚠️ GROQ_API_KEY not found in secrets. Please add it in Streamlit Cloud settings.")
+    # API key is now in groq_client.py, no need for secrets
+    try:
+        groq = GroqClient()
+        storage = StorageManager()
+        return groq, storage
+    except ValueError as e:
+        st.error(f"⚠️ {str(e)}")
+        st.info("Please add your Groq API key in the `groq_client.py` file where it says 'your_groq_api_key_here'")
         st.stop()
-    groq = GroqClient(api_key=api_key)
-    storage = StorageManager()
-    return groq, storage
 
 groq_client, storage_manager = init_clients()
 
