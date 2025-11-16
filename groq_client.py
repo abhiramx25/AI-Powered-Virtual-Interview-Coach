@@ -1,117 +1,138 @@
 import os
 import json
-import re
-import requests
+from typing import Any, Dict, List, Optional
 
-class GroqClient:
-    def __init__(self, api_key: str = None, model: str = "llama-3.3-70b-versatile"):
-        """
-        Initialize the Groq client.
-        You can pass an API key or set it in an environment variable.
-        """
-        self.api_key = api_key or os.getenv("GROQ_API_KEY") or "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"
-        if not self.api_key:
-            raise ValueError("Groq API key not found.")
-        
+from groq import Groq
+
+
+DEFAULT_MODEL = "llama-3.3-70b-versatile"  # fast & high quality
+
+
+class GroqInterviewClient:
+    """
+    Thin wrapper around Groq chat API for:
+    - generating interview questions
+    - evaluating answers
+    - creating improvement tips
+    """
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model: str = DEFAULT_MODEL,
+        temperature: float = 0.3,
+    ) -> None:
+        api_key = api_key or os.environ.get("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")
+        if not api_key:
+            raise ValueError(
+                "GROQ_API_KEY is not set. "
+                "Set it as an environment variable or pass api_key explicitly."
+            )
+
+        self.client = Groq(api_key=api_key)
         self.model = model
-        self.base_url = "https://api.groq.com/openai/v1/chat/completions"
+        self.temperature = temperature
 
-    def generate(self, prompt: str, max_tokens: int = 300, temperature: float = 0.3):
-        """
-        Generate a text response from Groq’s model.
-        """
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
+    # ---------- internal helpers ----------
 
-        data = {
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": "You are a helpful AI interview coach."},
-                {"role": "user", "content": prompt}
+    def _chat_json(self, system_prompt: str, user_prompt: str) -> Dict[str, Any]:
+        """Send a chat completion request that MUST return valid JSON."""
+        response = self.client.chat.completions.create(
+            model=self.model,
+            temperature=self.temperature,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
             ],
-            "temperature": temperature,
-            "max_tokens": max_tokens
+        )
+        content = response.choices[0].message.content
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            # In case the model misbehaves, wrap in a fallback structure.
+            return {"raw": content}
+
+    # ---------- public methods ----------
+
+    def generate_questions(
+        self,
+        role: str,
+        seniority: str,
+        interview_type: str,
+        n_questions: int = 5,
+    ) -> List[Dict[str, Any]]:
+        """
+        Returns a list of questions like:
+        [
+          {"id": 1, "category": "behavioral", "question": "..."},
+          ...
+        ]
+        """
+        system_prompt = (
+            "You are an expert interviewer and AI interview coach. "
+            "Generate realistic interview questions tailored to the candidate. "
+            "Return ONLY valid JSON with a top-level key 'questions'. "
+            "Each question must have: id (int), category (string), question (string). "
+            "Categories can be: 'behavioral', 'technical', or 'situational'."
+        )
+
+        user_prompt = f"""
+Role: {role}
+Seniority: {seniority}
+Interview type: {interview_type}
+Number of questions: {n_questions}
+
+Constraints:
+- Start with easier questions and gradually increase difficulty.
+- Mix behavioral and technical if interview_type is 'Mixed'.
+- Focus on modern best practices and real-world scenarios.
+"""
+        data = self._chat_json(system_prompt, user_prompt)
+        return data.get("questions", [])
+
+    def evaluate_answer(
+        self,
+        question: str,
+        answer: str,
+        role: str,
+        seniority: str,
+    ) -> Dict[str, Any]:
+        """
+        Evaluate an answer and return a dict like:
+        {
+          "scores": {"clarity": 8, "confidence": 7, "content": 9, "overall": 8.0},
+          "strengths": ["...", "..."],
+          "improvements": ["...", "..."],
+          "suggested_answer": "...",
+          "soft_skills": ["communication", "ownership"],
         }
-
-        try:
-            response = requests.post(self.base_url, headers=headers, json=data)
-            response.raise_for_status()
-            result = response.json()
-            return result["choices"][0]["message"]["content"].strip()
-        except Exception as e:
-            return f"Error: {str(e)}"
-
-    def score_and_improve(self, question: str, user_answer: str, role: str):
         """
-        Analyze an interview answer, give scores and feedback as structured JSON.
-        """
-        prompt = f"""ROLE: {role}
-QUESTION: {question}
-USER ANSWER: {user_answer}
+        system_prompt = (
+            "You are an AI interview coach. Your job is to evaluate answers and "
+            "provide constructive, encouraging feedback.\n\n"
+            "Return ONLY valid JSON with keys:\n"
+            "- scores: object with integer fields clarity, confidence, content (1-10) "
+            "  and overall (float 1-10)\n"
+            "- strengths: list of short bullet strings\n"
+            "- improvements: list of short bullet strings\n"
+            "- suggested_answer: string with an improved sample answer\n"
+            "- soft_skills: list of high-level soft skills to focus on, such as "
+            "  'storytelling', 'stakeholder management', 'problem solving', etc."
+        )
 
-Analyze this interview answer and respond ONLY with a valid JSON:
-{{
-    "clarity_score": 8,
-    "confidence_score": 7,
-    "content_score": 6,
-    "critique": "Your answer was clear but lacked specific examples.",
-    "improved_answer": "As a {role}, I would approach this by giving specific examples and measurable outcomes.",
-    "soft_skills": ["Confidence", "Specificity", "Communication"]
-}}"""
+        user_prompt = f"""
+Candidate role: {role}
+Seniority: {seniority}
 
-        try:
-            raw_response = self.generate(prompt, max_tokens=600, temperature=0.4)
-            json_match = re.search(r'\{[\s\S]*\}', raw_response)
+Interview question:
+{question}
 
-            if json_match:
-                clean_json = json_match.group().replace('\n', ' ').replace('  ', ' ')
-                result = json.loads(clean_json)
-                return result
+Candidate answer:
+{answer}
 
-            # fallback
-            return {
-                "clarity_score": 6,
-                "confidence_score": 6,
-                "content_score": 6,
-                "critique": "Provide more structured examples to support your answer.",
-                "improved_answer": f"As a {role}, I would provide more details and measurable results.",
-                "soft_skills": ["Structure", "Confidence", "Specificity"]
-            }
-
-        except Exception as e:
-            return {
-                "clarity_score": 5,
-                "confidence_score": 5,
-                "content_score": 5,
-                "critique": str(e),
-                "improved_answer": "Error occurred while generating feedback.",
-                "soft_skills": ["N/A"]
-            }
-
-    def generate_questions(self, role: str, n: int = 5):
-        """
-        Generate professional interview questions for a given role.
-        """
-        prompt = f"Generate {n} professional interview questions for a {role} position. Return only a JSON array of strings."
-
-        try:
-            raw_response = self.generate(prompt, max_tokens=400, temperature=0.3)
-            array_match = re.search(r'\[.*\]', raw_response, re.DOTALL)
-            if array_match:
-                questions = json.loads(array_match.group())
-                if isinstance(questions, list):
-                    return questions[:n]
-            
-            # fallback
-            return [
-                f"Tell me about your experience as a {role}.",
-                f"What skills make you suitable for the {role} position?",
-                f"Describe a challenging project you handled as a {role}.",
-                f"How do you manage deadlines and priorities?",
-                f"What are your long-term goals as a {role}?"
-            ]
-        except Exception as e:
-            return [f"Error: {str(e)}"]
-
+Evaluate the answer and respond with the JSON object described above.
+Be honest but supportive. Keep all text concise and practical.
+"""
+        data = self._chat_json(system_prompt, user_prompt)
+        return data
