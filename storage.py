@@ -1,71 +1,165 @@
+from __future__ import annotations
+
 import sqlite3
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import pandas as pd
-from datetime import datetime
-from typing import Dict, Any
 
-DB_PATH = "interview_sessions.db"
+DB_PATH = Path(__file__).parent / "interview_coach.db"
 
-def init_db(db_path: str = DB_PATH):
-    """Initialize SQLite database"""
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS sessions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp TEXT NOT NULL,
-        role TEXT NOT NULL,
-        question TEXT NOT NULL,
-        user_answer TEXT NOT NULL,
-        clarity INTEGER DEFAULT 0,
-        confidence INTEGER DEFAULT 0,
-        content INTEGER DEFAULT 0,
-        critique TEXT,
-        improved_answer TEXT,
-        soft_skills TEXT
+
+def get_connection() -> sqlite3.Connection:
+    # check_same_thread=False is helpful for Streamlit
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db() -> None:
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_name TEXT NOT NULL,
+            role TEXT NOT NULL,
+            seniority TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """
     )
-    """)
-    
-    conn.commit()
-    conn.close()
 
-def save_result(record: Dict[str, Any], db_path: str = DB_PATH):
-    """Save interview session to database"""
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    # Convert soft_skills list to string
-    soft_skills = record.get("soft_skills", [])
-    soft_skills_str = ",".join(soft_skills) if isinstance(soft_skills, list) else str(soft_skills)
-    
-    cursor.execute("""
-    INSERT INTO sessions (
-        timestamp, role, question, user_answer, clarity, confidence, content, 
-        critique, improved_answer, soft_skills
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        datetime.now().isoformat(),
-        record.get("role", ""),
-        record.get("question", ""),
-        record.get("user_answer", ""),
-        record.get("clarity", 0),
-        record.get("confidence", 0),
-        record.get("content", 0),
-        record.get("critique", ""),
-        record.get("improved_answer", ""),
-        soft_skills_str
-    ))
-    
-    conn.commit()
-    conn.close()
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS responses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL,
+            question TEXT NOT NULL,
+            category TEXT,
+            answer TEXT NOT NULL,
+            clarity INTEGER,
+            confidence INTEGER,
+            content_score INTEGER,
+            overall REAL,
+            strengths TEXT,
+            improvements TEXT,
+            suggested_answer TEXT,
+            soft_skills TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (session_id) REFERENCES sessions (id)
+        );
+        """
+    )
 
-def load_all(db_path: str = DB_PATH) -> pd.DataFrame:
-    """Load all interview sessions"""
-    conn = sqlite3.connect(db_path)
-    try:
-        df = pd.read_sql_query("SELECT * FROM sessions ORDER BY timestamp DESC", conn)
-        return df
-    except:
-        return pd.DataFrame()
-    finally:
-        conn.close()
+    conn.commit()
+
+
+def create_session(user_name: str, role: str, seniority: str) -> int:
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO sessions (user_name, role, seniority)
+        VALUES (?, ?, ?)
+        """,
+        (user_name, role, seniority),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def log_response(
+    session_id: int,
+    question: str,
+    category: str,
+    answer: str,
+    evaluation: Dict[str, Any],
+) -> None:
+    scores = evaluation.get("scores", {})
+    strengths = evaluation.get("strengths", [])
+    improvements = evaluation.get("improvements", [])
+    suggested_answer = evaluation.get("suggested_answer", "")
+    soft_skills = evaluation.get("soft_skills", [])
+
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO responses (
+            session_id,
+            question,
+            category,
+            answer,
+            clarity,
+            confidence,
+            content_score,
+            overall,
+            strengths,
+            improvements,
+            suggested_answer,
+            soft_skills
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            session_id,
+            question,
+            category,
+            answer,
+            scores.get("clarity"),
+            scores.get("confidence"),
+            scores.get("content"),
+            scores.get("overall"),
+            " • ".join(strengths),
+            " • ".join(improvements),
+            suggested_answer,
+            ", ".join(soft_skills),
+        ),
+    )
+    conn.commit()
+
+
+def fetch_user_history(user_name: str) -> pd.DataFrame:
+    conn = get_connection()
+    query = """
+        SELECT
+            s.id AS session_id,
+            s.user_name,
+            s.role,
+            s.seniority,
+            s.created_at AS session_created_at,
+            r.id AS response_id,
+            r.question,
+            r.category,
+            r.answer,
+            r.clarity,
+            r.confidence,
+            r.content_score,
+            r.overall,
+            r.strengths,
+            r.improvements,
+            r.suggested_answer,
+            r.soft_skills,
+            r.created_at AS response_created_at
+        FROM sessions s
+        JOIN responses r ON s.id = r.session_id
+        WHERE s.user_name = ?
+        ORDER BY r.created_at ASC
+    """
+    df = pd.read_sql_query(query, conn, params=(user_name,))
+    return df
+
+
+def fetch_session_responses(session_id: int) -> pd.DataFrame:
+    conn = get_connection()
+    query = """
+        SELECT *
+        FROM responses
+        WHERE session_id = ?
+        ORDER BY created_at ASC
+    """
+    df = pd.read_sql_query(query, conn, params=(session_id,))
+    return df
