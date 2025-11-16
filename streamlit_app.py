@@ -244,7 +244,8 @@ if next_clicked:
         st.session_state.last_evaluation = None
     else:
         st.info("You’ve reached the end of this mock interview.")
-    st.experimental_rerun()
+    st.rerun()
+
 
 
 # ---------- feedback display ----------
@@ -324,3 +325,4 @@ if user_name.strip():
     render_progress(history_df)
 else:
     st.info("Enter your name in the sidebar to see your progress history.")
+
