@@ -1,11 +1,16 @@
 import os
 import json
 from typing import Any, Dict, List, Optional
-
 from groq import Groq
 
+DEFAULT_MODEL = "llama-3.3-70b-versatile"
 
-DEFAULT_MODEL = "llama-3.3-70b-versatile"  # fast & high quality
+# -------------------------------------------
+# 🔥 Your API key here (hardcoded)
+# ⚠️ REPLACE THIS VALUE WITH YOUR REAL KEY
+# ⚠️ DO NOT COMMIT YOUR REAL KEY TO GITHUB
+GROQ_API_KEY = "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"
+# -------------------------------------------
 
 
 class GroqInterviewClient:
@@ -22,18 +27,21 @@ class GroqInterviewClient:
         model: str = DEFAULT_MODEL,
         temperature: float = 0.3,
     ) -> None:
-        api_key = api_key or os.environ.get("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")
-        if not api_key:
+        # If user passes an API key use it,
+        # else use the hardcoded key from above
+        self.api_key = api_key or GROQ_API_KEY
+
+        if not self.api_key or self.api_key == "YOUR_GROQ_API_KEY_HERE":
             raise ValueError(
-                "GROQ_API_KEY is not set. "
-                "Set it as an environment variable or pass api_key explicitly."
+                "Groq API key is missing. Please set GROQ_API_KEY variable "
+                "in this file or pass it to GroqInterviewClient()."
             )
 
-        self.client = Groq(api_key=api_key)
+        self.client = Groq(api_key=self.api_key)
         self.model = model
         self.temperature = temperature
 
-    # ---------- internal helpers ----------
+    # ---------- internal method ----------
 
     def _chat_json(self, system_prompt: str, user_prompt: str) -> Dict[str, Any]:
         """Send a chat completion request that MUST return valid JSON."""
@@ -46,14 +54,14 @@ class GroqInterviewClient:
                 {"role": "user", "content": user_prompt},
             ],
         )
+
         content = response.choices[0].message.content
         try:
             return json.loads(content)
         except json.JSONDecodeError:
-            # In case the model misbehaves, wrap in a fallback structure.
             return {"raw": content}
 
-    # ---------- public methods ----------
+    # ---------- public API ----------
 
     def generate_questions(
         self,
@@ -62,19 +70,10 @@ class GroqInterviewClient:
         interview_type: str,
         n_questions: int = 5,
     ) -> List[Dict[str, Any]]:
-        """
-        Returns a list of questions like:
-        [
-          {"id": 1, "category": "behavioral", "question": "..."},
-          ...
-        ]
-        """
         system_prompt = (
             "You are an expert interviewer and AI interview coach. "
             "Generate realistic interview questions tailored to the candidate. "
-            "Return ONLY valid JSON with a top-level key 'questions'. "
-            "Each question must have: id (int), category (string), question (string). "
-            "Categories can be: 'behavioral', 'technical', or 'situational'."
+            "Return ONLY valid JSON with a top-level key 'questions'."
         )
 
         user_prompt = f"""
@@ -82,12 +81,8 @@ Role: {role}
 Seniority: {seniority}
 Interview type: {interview_type}
 Number of questions: {n_questions}
-
-Constraints:
-- Start with easier questions and gradually increase difficulty.
-- Mix behavioral and technical if interview_type is 'Mixed'.
-- Focus on modern best practices and real-world scenarios.
 """
+
         data = self._chat_json(system_prompt, user_prompt)
         return data.get("questions", [])
 
@@ -98,27 +93,10 @@ Constraints:
         role: str,
         seniority: str,
     ) -> Dict[str, Any]:
-        """
-        Evaluate an answer and return a dict like:
-        {
-          "scores": {"clarity": 8, "confidence": 7, "content": 9, "overall": 8.0},
-          "strengths": ["...", "..."],
-          "improvements": ["...", "..."],
-          "suggested_answer": "...",
-          "soft_skills": ["communication", "ownership"],
-        }
-        """
         system_prompt = (
             "You are an AI interview coach. Your job is to evaluate answers and "
-            "provide constructive, encouraging feedback.\n\n"
-            "Return ONLY valid JSON with keys:\n"
-            "- scores: object with integer fields clarity, confidence, content (1-10) "
-            "  and overall (float 1-10)\n"
-            "- strengths: list of short bullet strings\n"
-            "- improvements: list of short bullet strings\n"
-            "- suggested_answer: string with an improved sample answer\n"
-            "- soft_skills: list of high-level soft skills to focus on, such as "
-            "  'storytelling', 'stakeholder management', 'problem solving', etc."
+            "provide constructive, supportive feedback.\n"
+            "Return ONLY valid JSON."
         )
 
         user_prompt = f"""
@@ -130,9 +108,6 @@ Interview question:
 
 Candidate answer:
 {answer}
-
-Evaluate the answer and respond with the JSON object described above.
-Be honest but supportive. Keep all text concise and practical.
 """
-        data = self._chat_json(system_prompt, user_prompt)
-        return data
+
+        return self._chat_json(system_prompt, user_prompt)
