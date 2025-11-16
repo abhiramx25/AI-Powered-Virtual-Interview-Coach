@@ -5,21 +5,11 @@ from groq import Groq
 
 DEFAULT_MODEL = "llama-3.3-70b-versatile"
 
-# -------------------------------------------
-# 🔥 Hardcoded API Key (as you requested)
-# ⚠️ DO NOT COMMIT your real key to GitHub
+# Replace with your real key
 GROQ_API_KEY = "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"
-# -------------------------------------------
 
 
 class GroqInterviewClient:
-    """
-    Thin wrapper around Groq chat API for:
-    - generating interview questions
-    - evaluating answers
-    - creating improvement tips
-    """
-
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -27,18 +17,14 @@ class GroqInterviewClient:
         temperature: float = 0.3,
     ) -> None:
         self.api_key = api_key or GROQ_API_KEY
-
-        if not self.api_key or self.api_key == "YOUR_API_KEY_HERE":
-            raise ValueError(
-                "Groq API key is missing. Add it to GROQ_API_KEY or pass it directly."
-            )
+        if not self.api_key or self.api_key == "YOUR_KEY_HERE":
+            raise ValueError("Missing Groq API Key")
 
         self.client = Groq(api_key=self.api_key)
         self.model = model
         self.temperature = temperature
 
     def _chat_json(self, system_prompt: str, user_prompt: str) -> Dict[str, Any]:
-        """Send a chat completion request that MUST return valid JSON."""
         response = self.client.chat.completions.create(
             model=self.model,
             temperature=self.temperature,
@@ -51,7 +37,7 @@ class GroqInterviewClient:
         content = response.choices[0].message.content
         try:
             return json.loads(content)
-        except json.JSONDecodeError:
+        except Exception:
             return {"raw": content}
 
     def generate_questions(
@@ -61,41 +47,73 @@ class GroqInterviewClient:
         interview_type: str,
         n_questions: int = 5,
     ) -> List[Dict[str, Any]]:
-        system_prompt = (
-            "You are an expert interviewer and AI interview coach. "
-            "Return ONLY JSON with a 'questions' list."
-        )
-
-        user_prompt = f"""
+        sys = """
+You are an expert technical interviewer. Generate tailored interview questions.
+Return JSON ONLY with:
+{
+  "questions": [
+    { "id": 1, "category": "...", "question": "..."},
+    ...
+  ]
+}
+"""
+        user = f"""
 Role: {role}
 Seniority: {seniority}
-Interview type: {interview_type}
-Number of questions: {n_questions}
+Type: {interview_type}
+Count: {n_questions}
 """
+        data = self._chat_json(sys, user)
+        return data.get("questions", [])
 
-        return self._chat_json(system_prompt, user_prompt).get("questions", [])
-
-    def evaluate_answer(
+    def evaluate_batch(
         self,
-        question: str,
-        answer: str,
+        q_and_a: List[Dict[str, str]],
         role: str,
         seniority: str,
     ) -> Dict[str, Any]:
-        system_prompt = (
-            "You are an AI interview coach. Return ONLY JSON with score breakdown, "
-            "strengths, improvements, and a suggested answer."
-        )
+        """
+        Takes a list like:
+        [{"question": "...", "answer": "..."}]
+        and returns:
+        {
+          "feedback": [
+            {
+              "question": "...",
+              "scores": {...},
+              "strengths": [...],
+              "improvements": [...],
+              "suggested_answer": "..."
+            }
+          ],
+          "summary": {
+            "overall": 8.4,
+            "strengths_overall": [...],
+            "improvements_overall": [...],
+            "top_skill_focus": "communication"
+          }
+        }
+        """
+        sys = """
+You are an AI interview coach. Evaluate ALL answers together.
+Return JSON ONLY.
 
-        user_prompt = f"""
-Candidate role: {role}
+Return structure:
+{
+  "feedback": [... individual feedback per question ...],
+  "summary": {
+    "overall": float,
+    "strengths_overall": [...],
+    "improvements_overall": [...],
+    "top_skill_focus": string
+  }
+}
+"""
+        user = f"""
+Role: {role}
 Seniority: {seniority}
 
-Interview question:
-{question}
-
-Candidate answer:
-{answer}
+Answers:
+{json.dumps(q_and_a, indent=2)}
 """
-
-        return self._chat_json(system_prompt, user_prompt)
+        return self._chat_json(sys, user)
