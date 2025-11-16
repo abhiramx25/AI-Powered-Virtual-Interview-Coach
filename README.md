@@ -1,22 +1,27 @@
 🎯 AI-Powered Virtual Interview Coach
 
-An intelligent web application that provides personalized mock interview practice with instant AI feedback to help users improve their interview skills.
+A smart web app that helps users practice job interviews with real-time AI feedback, scoring, and progress tracking.
 
 🚀 Features
 
-- 🤖 **AI-Generated Questions** - Role-specific interview questions
-- 📊 **Instant Feedback** - Scores for Clarity, Confidence, and Content
-- 💡 **Improved Answers** - AI-suggested better responses
-- 🌟 **Soft Skills Analysis** - Personalized improvement tips
-- 📈 **Progress Tracking** - Visual analytics and performance trends
-- 🏆 **Achievement Badges** - Gamified learning experience
+🤖 AI-Generated Questions – Role & interview-type specific
 
-## 🛠️ Tech Stack
+📊 Instant Answer Evaluation – Scores for Clarity, Confidence & Content
 
-- **Frontend**: Streamlit
-- **AI Backend**: groq API
-- **Database**: SQLite
-- **Visualization**: Plotly, Pandas
-- **Language**: Python
+💡 Improved Answers – AI-generated sample answers
 
+✍️ Personalized Tips – Feedback to improve weaknesses
 
+📈 Progress Tracking – Charts, stats & session history
+
+🏆 Achievement Badges – Gamified learning & milestones
+
+💾 Auto-Saved Data – Local SQLite storage
+
+🛠️ Tech Stack
+Layer	Tools
+Frontend	Streamlit
+AI	Groq API (Llama 3.3 70B)
+Database	SQLite
+Visualization	Plotly, Pandas
+Language	Python
