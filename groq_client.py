@@ -9,7 +9,7 @@ class GroqClient:
         Initialize the Groq client.
         You can pass an API key or set it in an environment variable.
         """
-        self.api_key = api_key or os.getenv("GROQ_API_KEY") or "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"
+        self.api_key = api_key or os.getenv("GROQ_API_KEY") or "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"
         if not self.api_key:
             raise ValueError("Groq API key not found.")
         
@@ -114,3 +114,4 @@ Analyze this interview answer and respond ONLY with a valid JSON:
             ]
         except Exception as e:
             return [f"Error: {str(e)}"]
+
