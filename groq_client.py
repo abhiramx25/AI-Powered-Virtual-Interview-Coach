@@ -6,7 +6,7 @@ class GroqClient:
     def __init__(self, api_key=None):
         """Initialize Groq client with API key"""
         # Add your Groq API key here
-        GROQ_API_KEY = "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"  # Replace with your actual API key
+        GROQ_API_KEY = "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"  # Replace with your actual API key
         
         self.api_key = api_key or GROQ_API_KEY or os.getenv("GROQ_API_KEY")
         if not self.api_key or self.api_key == "your_groq_api_key_here":
@@ -157,3 +157,4 @@ Provide 5 specific, actionable tips to improve their interview performance. Retu
                 "focus_areas": ["Communication", "Preparation"],
                 "motivational_message": "Keep practicing! Every interview makes you better."
             }
+
