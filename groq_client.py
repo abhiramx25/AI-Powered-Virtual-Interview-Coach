@@ -55,25 +55,33 @@ class GroqClient:
     
     def evaluate_answer(self, question, answer, role, interview_type):
         """Evaluate user's answer and provide detailed feedback"""
-        prompt = f"""As an expert interviewer, evaluate this answer for a {role} position in a {interview_type} interview.
+        prompt = f"""As an expert and ENCOURAGING interviewer, evaluate this answer for a {role} position in a {interview_type} interview.
 
 Question: {question}
 Answer: {answer}
 
-Provide a detailed evaluation in the following JSON format:
+IMPORTANT GUIDELINES:
+- Be POSITIVE and CONSTRUCTIVE in your evaluation
+- Recognize good points in the answer
+- If the answer demonstrates understanding, score it fairly (75-85+ range)
+- Only give low scores (below 70) if the answer is completely off-topic or very poor
+- Focus on what the candidate did RIGHT, then suggest improvements
+- Be realistic - most interview answers are good enough, not perfect
+
+Provide evaluation in JSON format:
 {{
     "clarity_score": <0-100>,
     "confidence_score": <0-100>,
     "content_score": <0-100>,
     "overall_score": <0-100>,
-    "strengths": ["strength1", "strength2"],
-    "weaknesses": ["weakness1", "weakness2"],
-    "improved_answer": "A better version of the answer...",
-    "tips": ["tip1", "tip2", "tip3"],
-    "detailed_feedback": "Comprehensive feedback paragraph..."
+    "strengths": ["specific strength 1", "specific strength 2", "specific strength 3"],
+    "weaknesses": ["constructive area 1", "constructive area 2"],
+    "improved_answer": "An enhanced version that builds on their answer with more detail and structure...",
+    "tips": ["actionable tip 1", "actionable tip 2", "actionable tip 3"],
+    "detailed_feedback": "Start with what they did well, then provide constructive suggestions for improvement. Be encouraging!"
 }}
 
-Be constructive, specific, and encouraging. Scores should reflect actual quality."""
+Remember: Be fair, encouraging, and recognize the effort. Most decent answers should score 75-85+."""
         
         try:
             response = self.client.chat.completions.create(
@@ -91,20 +99,45 @@ Be constructive, specific, and encouraging. Scores should reflect actual quality
                 content = content.replace("```json", "").replace("```", "").strip()
             
             evaluation = json.loads(content)
+            
+            # Ensure scores are reasonable - boost low scores if answer has substance
+            if len(answer.strip()) > 50:  # If answer has decent length
+                if evaluation['overall_score'] < 70:
+                    evaluation['overall_score'] = min(75, evaluation['overall_score'] + 10)
+                if evaluation['clarity_score'] < 70:
+                    evaluation['clarity_score'] = min(75, evaluation['clarity_score'] + 10)
+                if evaluation['confidence_score'] < 70:
+                    evaluation['confidence_score'] = min(75, evaluation['confidence_score'] + 10)
+                if evaluation['content_score'] < 70:
+                    evaluation['content_score'] = min(75, evaluation['content_score'] + 10)
+            
             return evaluation
         except Exception as e:
             print(f"Error evaluating answer: {e}")
-            # Fallback evaluation
+            # Improved fallback evaluation based on answer length and quality
+            answer_length = len(answer.strip())
+            base_score = 75 if answer_length > 50 else 65
+            
             return {
-                "clarity_score": 70,
-                "confidence_score": 70,
-                "content_score": 70,
-                "overall_score": 70,
-                "strengths": ["Good attempt at answering"],
-                "weaknesses": ["Could provide more details"],
-                "improved_answer": "Consider expanding on your points with specific examples.",
-                "tips": ["Practice more", "Use STAR method", "Be more specific"],
-                "detailed_feedback": "Your answer shows understanding but could benefit from more concrete examples."
+                "clarity_score": base_score,
+                "confidence_score": base_score,
+                "content_score": base_score,
+                "overall_score": base_score,
+                "strengths": [
+                    "You attempted to answer the question",
+                    "Your response shows effort and engagement"
+                ],
+                "weaknesses": [
+                    "Could expand with more specific examples",
+                    "Consider adding more technical details"
+                ],
+                "improved_answer": "Consider structuring your answer with: 1) Direct response to the question, 2) Specific example from your experience, 3) Results or lessons learned. This makes your answer more impactful and memorable.",
+                "tips": [
+                    "Use the STAR method (Situation, Task, Action, Result)",
+                    "Practice speaking out loud before typing",
+                    "Include specific numbers and metrics when possible"
+                ],
+                "detailed_feedback": "You've made a good start! Your answer shows understanding of the question. To make it even stronger, try adding specific examples from your experience and concrete details. Remember, interviewers love to hear real stories and measurable results."
             }
     
     def generate_personalized_tips(self, user_stats, role):
@@ -157,4 +190,3 @@ Provide 5 specific, actionable tips to improve their interview performance. Retu
                 "focus_areas": ["Communication", "Preparation"],
                 "motivational_message": "Keep practicing! Every interview makes you better."
             }
-
