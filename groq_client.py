@@ -96,48 +96,47 @@ Make questions clear, specific, and interview-appropriate."""
     
     def evaluate_answer(self, question, answer, role, interview_type):
         """Evaluate user's answer and provide detailed feedback"""
-        prompt = f"""You are a professional interview coach. A candidate answered an interview question. Your job:
+        prompt = f"""You are an expert interview coach. You must:
 
-1. EVALUATE their answer quality (is it good, bad, nonsense, or incomplete?)
-2. PROVIDE the CORRECT/IDEAL answer to the question
-3. Give constructive feedback
+1. Evaluate the candidate's answer honestly
+2. Provide the COMPLETE, CORRECT answer to the question (not suggestions, but the ACTUAL full answer)
 
-Question: {question}
+Interview Question: {question}
 Candidate's Answer: {answer}
 Role: {role}
-Interview Type: {interview_type}
+Type: {interview_type}
 
-SCORING RULES:
-- Random text/nonsense (like "gjghjgh", "test", etc): 20-30 score
-- Very short/vague answer: 40-50 score
-- Decent attempt but incomplete: 60-70 score
-- Good answer with some details: 75-85 score
-- Excellent answer with examples: 85-95 score
+SCORING:
+- Random/nonsense text: 15-30 score
+- Very short/incomplete: 40-60 score  
+- Decent attempt: 65-75 score
+- Good with examples: 75-85 score
+- Excellent detailed answer: 85-95 score
 
-Return ONLY valid JSON:
+Return ONLY this JSON format:
 {{
-    "clarity_score": 25,
-    "confidence_score": 25,
-    "content_score": 25,
-    "overall_score": 25,
-    "strengths": ["If answer is good, list what they did right. If bad/nonsense, say 'N/A - Answer not relevant'"],
-    "weaknesses": ["What's wrong with their answer - be specific"],
-    "improved_answer": "THE CORRECT/IDEAL ANSWER TO THIS QUESTION: [Provide a complete, professional answer that demonstrates exactly how this question SHOULD be answered. Include specific examples, technical details, and structure using STAR method where appropriate. This should be a MODEL answer that the candidate can learn from.]",
-    "tips": ["How to answer this TYPE of question", "What interviewers look for", "Common mistakes to avoid"],
-    "detailed_feedback": "First assess if their answer was relevant. If it was nonsense/random text, clearly state that. Then explain what a good answer should include for THIS specific question."
+    "clarity_score": <number>,
+    "confidence_score": <number>,
+    "content_score": <number>,
+    "overall_score": <number>,
+    "strengths": ["What was good, or 'N/A' if nonsense"],
+    "weaknesses": ["What was wrong/missing"],
+    "improved_answer": "THE COMPLETE CORRECT ANSWER TO THE QUESTION: [Write the full, proper answer here as if YOU are answering the interview question perfectly. Include definitions, examples, technical details, real-world scenarios, and specific numbers. Make this a FULL answer that demonstrates mastery of the topic, not just tips or suggestions. This should be 100-200 words of actual content answering the question.]",
+    "tips": ["General tips for this question type"],
+    "detailed_feedback": "Honest assessment of their answer and what the correct answer should contain"
 }}
 
-IMPORTANT: The "improved_answer" should be a COMPLETE, CORRECT answer to the question, not just suggestions. Show them exactly what they should have said!"""
+CRITICAL: The "improved_answer" must be a COMPLETE, STANDALONE answer that fully addresses the question with specific details, examples, and technical depth. Write it as if you are the candidate giving a perfect answer in an interview."""
         
         try:
             response = self.client.chat.completions.create(
                 messages=[
-                    {"role": "system", "content": "You are an expert interview coach. You must provide the CORRECT answer to interview questions, not just evaluate. When candidates give nonsense answers, give them low scores and show them the right answer."},
+                    {"role": "system", "content": "You are an expert interviewer who provides COMPLETE, CORRECT answers to questions. When evaluating, you must write out the full proper answer, not just give suggestions. Be honest with scoring - give low scores for nonsense answers."},
                     {"role": "user", "content": prompt}
                 ],
                 model=self.model,
-                temperature=0.5,
-                max_tokens=3000
+                temperature=0.6,
+                max_tokens=3500
             )
             
             content = response.choices[0].message.content.strip()
@@ -171,59 +170,53 @@ IMPORTANT: The "improved_answer" should be a COMPLETE, CORRECT answer to the que
         except Exception as e:
             print(f"Error evaluating answer: {e}")
             
-            # Check if answer is nonsense
+            # Fallback - provide complete correct answer
             answer_words = answer.strip().split()
-            is_nonsense = len(answer_words) <= 2 or len(answer.strip()) < 10
+            is_nonsense = len(answer_words) <= 3 or len(answer.strip()) < 15
             
             if is_nonsense:
-                # Low score for nonsense answers
-                return {
-                    "clarity_score": 25,
-                    "confidence_score": 25,
-                    "content_score": 25,
-                    "overall_score": 25,
-                    "strengths": ["N/A - Answer not relevant to the question"],
-                    "weaknesses": [
-                        "Answer appears to be random text or not related to the question",
-                        "No meaningful content provided",
-                        "Does not demonstrate understanding of the topic"
-                    ],
-                    "improved_answer": f"CORRECT ANSWER: This question asks about '{question}'. A strong answer should include:\n\n1. **Direct Response**: Start by directly answering what was asked\n2. **Specific Example**: Share a real situation from your experience\n3. **Technical Details**: Include relevant tools, methods, or frameworks you used\n4. **Measurable Results**: Quantify the impact (e.g., '30% improvement', 'saved 10 hours/week')\n5. **Key Learnings**: What you learned or would do differently\n\nExample structured answer: 'To address [the question topic], I would [direct approach]. In my previous role, I [specific example with context]. I used [technical details/methods] which resulted in [quantifiable outcome]. This experience taught me [key insight].'",
-                    "tips": [
-                        "Always provide a meaningful answer related to the question",
-                        "Use the STAR method: Situation, Task, Action, Result",
-                        "Include specific examples from your real experience",
-                        "Add numbers and metrics to demonstrate impact",
-                        "Think before typing - quality over speed"
-                    ],
-                    "detailed_feedback": "Your answer doesn't appear to address the question. In a real interview, you need to provide relevant, thoughtful responses that demonstrate your knowledge and experience. Take time to understand what the interviewer is asking, think of a relevant example from your background, and structure your answer clearly. Even if you don't know the perfect answer, showing your thought process and problem-solving approach is valuable."
-                }
+                base_score = 20
+            elif len(answer_words) < 10:
+                base_score = 50
             else:
-                # Regular fallback for actual attempts
-                base_score = 72
-                return {
-                    "clarity_score": base_score,
-                    "confidence_score": base_score,
-                    "content_score": base_score,
-                    "overall_score": base_score,
-                    "strengths": [
-                        "You made an attempt to answer",
-                        "You engaged with the question"
-                    ],
-                    "weaknesses": [
-                        "Could provide more specific details and examples",
-                        "Answer needs more structure and depth"
-                    ],
-                    "improved_answer": f"BETTER ANSWER FOR: '{question}'\n\nA comprehensive answer should include:\n\n**Opening**: Briefly state your direct answer or approach\n\n**Example**: 'In my previous role at [Company/Project], I encountered a similar situation where [specific scenario]. My responsibility was to [clear task].'\n\n**Action**: 'I approached this by: 1) [First step with details], 2) [Second step with technical specifics], 3) [Third step showing initiative]'\n\n**Result**: 'This led to [quantifiable outcome - e.g., 40% efficiency gain, $10K cost savings, improved user satisfaction from 3.5 to 4.7 stars]'\n\n**Learning**: 'This experience taught me [key insight] and I've since applied this approach to [related situations].'",
-                    "tips": [
-                        "Structure answers with clear beginning, middle, and end",
-                        "Always include at least one specific, detailed example",
-                        "Quantify your impact with numbers whenever possible",
-                        "Show don't just tell - use concrete details",
-                        "Practice STAR method for consistent structure"
-                    ],
-                    "detailed_feedback": "You've shown effort in responding. To significantly strengthen your answer: First, provide a direct response to what was asked. Then, support it with a detailed, real example including what you did, how you did it, and what the results were. Use specific numbers and technical details where relevant. Interviewers want to see evidence of your capabilities through concrete examples, not just statements."
-                }
+                base_score = 70
+            
+            # Generate a proper answer based on the question keywords
+            question_lower = question.lower()
+            
+            # Create context-aware correct answer
+            if "difference" in question_lower or "compare" in question_lower:
+                correct_answer_template = f"To answer '{question}': The key differences are: (1) First aspect - [Definition and example with specific details], (2) Second aspect - [Contrasting approach with real-world application], (3) Third aspect - [Practical implications]. For instance, in my experience working on [specific project], I used [specific approach] which resulted in [quantifiable outcome like 40% improvement or $50K savings]. The main distinction is [core differentiator with technical explanation]."
+            elif "how would you" in question_lower or "how do you" in question_lower:
+                correct_answer_template = f"To answer '{question}': My approach would be: (1) First, I would [specific action with reasoning], (2) Then, I'd [detailed next step with tools/methods], (3) Finally, [completion strategy with metrics]. For example, when I faced a similar situation at [Company/Project], I [specific detailed action taken], using [specific tools/technologies], which achieved [measurable result - e.g., reduced time by 60%, increased efficiency by 35%]. This systematic approach ensures [key benefit]."
+            elif "what is" in question_lower or "define" in question_lower or "explain" in question_lower:
+                correct_answer_template = f"To answer '{question}': This refers to [clear definition with technical accuracy]. In practice, it works by [mechanism/process explanation with details]. The key characteristics are: [3-4 specific points with examples]. For instance, in a real-world scenario, [concrete example with company/project context], this was implemented by [specific implementation details], resulting in [quantifiable outcomes like performance metrics, user impact, or business value]. The significance is [why this matters in professional context]."
+            elif "experience" in question_lower or "tell me about" in question_lower:
+                correct_answer_template = f"To answer '{question}': In my previous role at [Company/Project name], I encountered [specific situation that relates to the question]. My responsibility was to [clear task description]. I approached this by: (1) [First detailed action], (2) [Second specific step with tools used], (3) [Third implementation detail]. This resulted in [specific measurable outcomes - e.g., 45% performance improvement, processed 10,000+ records daily, saved 15 hours weekly]. The key learning was [professional insight], which I've since applied to [related situations with outcomes]."
+            else:
+                correct_answer_template = f"To answer '{question}': The comprehensive answer includes: (1) [Core concept explanation with technical details], (2) [Practical application with real-world example], (3) [Specific outcomes or benefits with metrics]. For example, when working on [specific project context], I implemented [detailed approach] using [specific tools/technologies], which led to [quantifiable results like 30% efficiency gain or improved accuracy from 75% to 92%]. This demonstrates [key professional competency] through [concrete evidence]."
+            
+            return {
+                "clarity_score": base_score,
+                "confidence_score": base_score,
+                "content_score": base_score,
+                "overall_score": base_score,
+                "strengths": ["N/A - Answer not adequate"] if is_nonsense else ["You attempted to address the topic"],
+                "weaknesses": [
+                    "Answer is not relevant to the question" if is_nonsense else "Lacks specific details and examples",
+                    "Missing technical depth and concrete examples",
+                    "No measurable outcomes or real-world context provided"
+                ],
+                "improved_answer": correct_answer_template,
+                "tips": [
+                    "Always structure your answer with: Definition → Example → Result",
+                    "Include specific numbers and metrics (e.g., '40% increase', '500 users')",
+                    "Use the STAR method for behavioral questions",
+                    "Mention specific tools, technologies, or frameworks",
+                    "Quantify your impact with measurable outcomes"
+                ],
+                "detailed_feedback": f"{'Your answer appears to be random text or incomplete.' if is_nonsense else 'Your answer needs more substance.'} For this question, you should provide: (1) A clear, direct response to what's being asked, (2) A specific example from your real experience with detailed context, (3) Technical specifics or methodologies used, (4) Quantifiable results that demonstrate impact. Strong answers in interviews always combine theoretical knowledge with practical evidence. See the improved answer above for a complete response to this question."
+            }
     
     def generate_personalized_tips(self, user_stats, role):
         """Generate personalized improvement tips based on user's performance"""
