@@ -1,10 +1,14 @@
 import os
-from groq import Groq
 import json
 
 class GroqClient:
     def __init__(self, api_key=None):
         """Initialize Groq client with API key"""
+        try:
+            from groq import Groq
+        except ImportError:
+            raise ImportError("Groq library not installed. Run: pip install groq")
+        
         # Try to get API key from multiple sources
         self.api_key = api_key or os.getenv("GROQ_API_KEY")
         
@@ -57,17 +61,38 @@ Make questions clear, specific, and interview-appropriate."""
             # Clean up response if it contains markdown
             if content.startswith("```json"):
                 content = content.replace("```json", "").replace("```", "").strip()
+            if content.startswith("```"):
+                content = content.replace("```", "").strip()
             
             questions = json.loads(content)
             return questions
         except Exception as e:
             print(f"Error generating questions: {e}")
             # Fallback questions
-            return [
-                {"question": f"Tell me about your experience with {role} responsibilities.", "difficulty": "Easy"},
-                {"question": f"What challenges have you faced in {interview_type} scenarios?", "difficulty": "Medium"},
-                {"question": f"How would you handle a complex {role} situation?", "difficulty": "Hard"}
-            ]
+            fallback_questions = {
+                "Software Engineer": [
+                    {"question": "Tell me about a challenging technical problem you solved recently.", "difficulty": "Easy"},
+                    {"question": "How do you approach debugging complex issues in production?", "difficulty": "Medium"},
+                    {"question": "Describe your experience with version control and collaboration tools.", "difficulty": "Easy"},
+                    {"question": "Explain a time when you had to optimize code for better performance.", "difficulty": "Medium"},
+                    {"question": "How do you stay updated with new technologies and programming trends?", "difficulty": "Easy"}
+                ],
+                "Data Scientist": [
+                    {"question": "Describe a data analysis project you're proud of.", "difficulty": "Easy"},
+                    {"question": "How do you handle missing or messy data in your datasets?", "difficulty": "Medium"},
+                    {"question": "Explain your experience with machine learning algorithms.", "difficulty": "Medium"},
+                    {"question": "How do you communicate technical findings to non-technical stakeholders?", "difficulty": "Medium"},
+                    {"question": "Tell me about a time when your analysis led to actionable business insights.", "difficulty": "Hard"}
+                ]
+            }
+            
+            return fallback_questions.get(role, [
+                {"question": f"Tell me about your experience in {role} roles.", "difficulty": "Easy"},
+                {"question": f"What challenges have you faced in {interview_type} situations?", "difficulty": "Medium"},
+                {"question": f"How do you approach problem-solving in your field?", "difficulty": "Medium"},
+                {"question": f"Describe a successful project you completed.", "difficulty": "Easy"},
+                {"question": f"Where do you see yourself growing in this role?", "difficulty": "Medium"}
+            ])[:num_questions]
     
     def evaluate_answer(self, question, answer, role, interview_type):
         """Evaluate user's answer and provide detailed feedback"""
@@ -97,7 +122,7 @@ Return ONLY valid JSON (no markdown, no extra text):
     "detailed_feedback": "Great start! You clearly understand the concept. Your answer would be even stronger with: 1) A specific real-world example from your experience, 2) Quantifiable results or metrics, 3) More technical depth. For instance, instead of saying 'I handled data', say 'I processed 10,000 records using Python pandas, reducing processing time by 40%'."
 }}
 
-Make feedback ENCOURAGING yet CONSTRUCTIVE. Help them improve, don't discourage them!
+Make feedback ENCOURAGING yet CONSTRUCTIVE. Help them improve, don't discourage them!"""
         
         try:
             response = self.client.chat.completions.create(
@@ -200,6 +225,8 @@ Provide 5 specific, actionable tips to improve their interview performance. Retu
             content = response.choices[0].message.content.strip()
             if content.startswith("```json"):
                 content = content.replace("```json", "").replace("```", "").strip()
+            if content.startswith("```"):
+                content = content.replace("```", "").strip()
             
             tips = json.loads(content)
             return tips
@@ -207,12 +234,12 @@ Provide 5 specific, actionable tips to improve their interview performance. Retu
             print(f"Error generating tips: {e}")
             return {
                 "tips": [
-                    "Practice answering questions out loud",
+                    "Practice answering questions out loud before typing",
                     "Use the STAR method for behavioral questions",
-                    "Research the company before interviews",
+                    "Research the company and role before interviews",
                     "Prepare specific examples from your experience",
                     "Focus on clear, concise communication"
                 ],
                 "focus_areas": ["Communication", "Preparation"],
-                "motivational_message": "Keep practicing! Every interview makes you better."
+                "motivational_message": "Keep practicing! Every interview makes you better. You're making great progress!"
             }
