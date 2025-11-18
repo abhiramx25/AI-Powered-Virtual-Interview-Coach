@@ -2,28 +2,14 @@ import os
 from groq import Groq
 import json
 
-try:
-    from config import GROQ_API_KEY as CONFIG_KEY
-except ImportError:
-    CONFIG_KEY = None
-
 class GroqClient:
     def __init__(self, api_key=None):
         """Initialize Groq client with API key"""
-        # Priority: 1. Parameter, 2. Config file, 3. Environment variable, 4. Streamlit secrets
-        self.api_key = api_key or CONFIG_KEY or os.getenv("GROQ_API_KEY")
-        
-        # If still no key, try Streamlit secrets
-        if not self.api_key:
-            try:
-                import streamlit as st
-                self.api_key = st.secrets.get("GROQ_API_KEY")
-            except:
-                pass
-        
-        if not self.api_key:
-            raise ValueError("⚠️ GROQ_API_KEY not found. Please add it in Streamlit Secrets or config.py")
-        
+        # Add your Groq API key here
+       
+        self.api_key = api_key or GROQ_API_KEY or os.getenv("GROQ_API_KEY")
+        if not self.api_key or self.api_key == "your_groq_api_key_here":
+            raise ValueError("GROQ_API_KEY not found. Please add your API key in groq_client.py")
         self.client = Groq(api_key=self.api_key)
         self.model = "llama-3.3-70b-versatile"
     
