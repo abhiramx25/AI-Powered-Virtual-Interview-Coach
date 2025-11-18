@@ -4,8 +4,14 @@ import plotly.express as px
 import pandas as pd
 from datetime import datetime
 import time
-from groq_client import GroqClient
-from storage import StorageManager
+
+# Import custom modules
+try:
+    from groq_client import GroqClient
+    from storage import StorageManager
+except ImportError as e:
+    st.error(f"Import Error: {e}")
+    st.stop()
 
 # Page configuration
 st.set_page_config(
